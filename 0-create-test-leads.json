@@ -1,0 +1,140 @@
+{
+  "name": "0 - Create test leads (Agile CRM)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -16
+      ],
+      "id": "39d72baf-99cc-4c53-9dfa-0fa73358fe26",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "additionalFields": {
+          "company": "={{ $json.company }}",
+          "emailOptions": {
+            "emailProperties": [
+              {
+                "subtype": "personal",
+                "email": "={{ $json.email }}"
+              }
+            ]
+          },
+          "firstName": "={{ $json.firstName }}",
+          "lastName": "={{ $json.lastName }}",
+          "phoneOptions": {
+            "phoneProperties": [
+              {
+                "subtype": "mobile",
+                "number": "={{ $json.phone }}"
+              }
+            ]
+          },
+          "customProperties": {
+            "customProperty": [
+              {
+                "name": "Skype_ID",
+                "value": "={{ $json.skypeId }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.agileCrm",
+      "typeVersion": 1,
+      "position": [
+        288,
+        -16
+      ],
+      "id": "78e7fcc2-5a2d-4e88-a6d6-8fe9c892721d",
+      "name": "Create a contact",
+      "credentials": {
+        "agileCrmApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR agileCrmApi CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"leads\": [\n    {\"firstName\": \"Andrii\", \"lastName\": \"Kovalenko\", \"email\": \"andrii.test002@mailinator.com\", \"phone\": \"380671112233\", \"company\": \"SunTech Instal\", \"skypeId\": \"test_session_002\"},\n    {\"firstName\": \"Oleh\", \"lastName\": \"Marchenko\", \"email\": \"oleh.test003@mailinator.com\", \"phone\": \"380672223344\", \"company\": \"BudService LLC\", \"skypeId\": \"test_session_003\"},\n    {\"firstName\": \"Iryna\", \"lastName\": \"Sydorenko\", \"email\": \"iryna.test004@mailinator.com\", \"phone\": \"380673334455\", \"company\": \"EcoDim Trading\", \"skypeId\": \"test_session_004\"},\n    {\"firstName\": \"Vitalii\", \"lastName\": \"Bondar\", \"email\": \"vitalii.test005@mailinator.com\", \"phone\": \"380674445566\", \"company\": \"Retail Solar Shop\", \"skypeId\": \"test_session_005\"},\n    {\"firstName\": \"Sergii\", \"lastName\": \"Tkachenko\", \"email\": \"sergii.test006@mailinator.com\", \"phone\": \"380675556677\", \"company\": \"ProInstall Group\", \"skypeId\": \"test_session_006\"},\n    {\"firstName\": \"Nataliia\", \"lastName\": \"Melnyk\", \"email\": \"nataliia.test007@mailinator.com\", \"phone\": \"380676667788\", \"company\": \"Green Energy UA\", \"skypeId\": \"test_session_007\"},\n    {\"firstName\": \"Dmytro\", \"lastName\": \"Shevchenko\", \"email\": \"dmytro.test008@mailinator.com\", \"phone\": \"380677778899\", \"company\": \"Private Buyer\", \"skypeId\": \"test_session_008\"},\n    {\"firstName\": \"Yulia\", \"lastName\": \"Kravets\", \"email\": \"yulia.test009@mailinator.com\", \"phone\": \"380678889900\", \"company\": \"SolarPro Ukraine\", \"skypeId\": \"test_session_009\"},\n    {\"firstName\": \"Roman\", \"lastName\": \"Lysenko\", \"email\": \"roman.test010@mailinator.com\", \"phone\": \"380679990011\", \"company\": \"Agro Complex\", \"skypeId\": \"test_session_010\"},\n    {\"firstName\": \"Kateryna\", \"lastName\": \"Boyko\", \"email\": \"kateryna.test011@mailinator.com\", \"phone\": \"380670001122\", \"company\": \"Construction Ltd\", \"skypeId\": \"test_session_011\"},\n    {\"firstName\": \"Mykola\", \"lastName\": \"Pavlenko\", \"email\": \"mykola.test012@mailinator.com\", \"phone\": \"380671112244\", \"company\": \"Home Owner Test\", \"skypeId\": \"test_session_012\"}\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -128,
+        -16
+      ],
+      "id": "20002a08-3895-45a7-a89f-cf2130e226d6",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "leads",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        96,
+        -16
+      ],
+      "id": "fb2a3fd8-2738-4bc5-9b9b-8d4a06d3f495",
+      "name": "Split Out"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Create a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

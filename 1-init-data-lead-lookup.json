@@ -1,0 +1,118 @@
+{
+  "name": "1 - INIT_DATA lead lookup for voice agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "init_data",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "881d065a-f9ac-4ae4-adf6-0e3b9d445ccf",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "url": "=https://YOUR_DOMAIN.agilecrm.com/dev/api/contacts/search/phonenumber/{{ $json.body.phone_number }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "1e751126-b6dc-41da-af8f-0764b9c915c5",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR httpBasicAuth CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $input.first().json;\n\nfunction getProp(name) {\n  const found = (contact.properties || []).find(p => p.name === name);\n  return found ? found.value : \"\";\n}\n\nconst firstName = getProp(\"first_name\");\nconst lastName = getProp(\"last_name\");\nconst company = getProp(\"company\");\n\nreturn {\n  \"type\": \"conversation_initiation_client_data\",\n  \"dynamic_variables\": {\n    name: `${firstName} ${lastName}`.trim(),\n    company: company,\n    time_date: DateTime.now(),\n    id_lead: contact.id\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "4e3258dc-1e13-44ac-9392-0ca0d8b34c2b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        0
+      ],
+      "id": "ad1443a6-2bd4-4dc4-a20e-a07b957a3938",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

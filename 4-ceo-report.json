@@ -1,0 +1,302 @@
+{
+  "name": "4 - Weekly AI report to the CEO",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                5
+              ],
+              "triggerAtHour": 17
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -976,
+        -224
+      ],
+      "id": "56c590a1-5dcf-4339-bce0-c5effa5396cc",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.all().map(item => item.json);\n\nfunction getProp(props, name) {\n  const p = (props || []).find(p => p.name === name);\n  return p ? p.value : \"\";\n}\n\nconst byScoreRange = {\n  \"Гарячі (score >= 50)\": 0,\n  \"Холодні (score < 50)\": 0,\n  \"Без оцінки (score = 0)\": 0\n};\n\nlet newLeadsCount = 0;\nconst now = Math.floor(Date.now() / 1000);\nconst weekAgo = now - 7 * 24 * 60 * 60;\n\nfor (const lead of data) {\n  const score = lead.lead_score || 0;\n\n  if (score >= 50) {\n    byScoreRange[\"Гарячі (score >= 50)\"]++;\n  } else if (score > 0) {\n    byScoreRange[\"Холодні (score < 50)\"]++;\n  } else {\n    byScoreRange[\"Без оцінки (score = 0)\"]++;\n  }\n\n  if (lead.created_time && lead.created_time >= weekAgo) {\n    newLeadsCount++;\n  }\n}\n\nconst result = {\n  total_leads: data.length,\n  new_leads_count: newLeadsCount,\n  by_stage: byScoreRange,\n  by_owner: {}\n};\n\nreturn [{ json: result }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        -224
+      ],
+      "id": "f1495f64-11ef-4da2-b331-5a5fe9eb9989",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Call analysis results"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Лист1"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -304,
+        -224
+      ],
+      "id": "6103d871-d683-4af4-ac04-f2cd4a495805",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR googleSheetsOAuth2Api CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Загальні результати по воронці лідів\ntotal_leads = {{ $('Code in JavaScript').item.json.total_leads }}\n\nnew_leads_count = {{ $('Code in JavaScript').item.json.new_leads_count }}\n\nby_stage = {{ JSON.stringify($('Code in JavaScript').item.json.by_stage) }}\nліди по менеджерам = {{ JSON.stringify($('Code in JavaScript').item.json.by_owner) }}\n\nданы по кваліфікації \n\nпроблеми = {{ $json['помилки'].join('; ') }}\nуспішні патерни = {{ $json[\"успішний патерн\"].join('; ') }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "# РОЛЬ\nТи — досвідчений аналітик відділу продажів та CRM-воронок. Твоя задача — проаналізувати дані по лідах і кваліфікації та видати структурований діагноз.\n\n# ВХІДНІ ДАНІ\nТобі надаються дані у наступному форматі:\n\n## Воронка лідів\n- total_leads: <число> — загальна кількість лідів\n- new_leads_count: <число> — кількість нових лідів за період\n- by_stage: <словник {стадія: кількість}> — розподіл лідів по стадіях воронки\n\n## Кваліфікація\n- проблеми: <текст> — виявлені помилки або їх відсутність у роботі агента/менеджерів на етапі кваліфікації\n- успішні патерни: <текст> — фрази та підходи, які спрацювали добре\n\n## Дані по менеджерах (якщо передані)\n- <ім'я менеджера>: {ліди, конверсія, стадії, проблеми}\n\n# ЛОГІКА АНАЛІЗУ\n\n## 1. Аналіз проблем воронки\n- Перевір співвідношення new_leads_count до total_leads (низький приплив?).\n- Знайди стадії з аномальним накопиченням (>20% від total_leads на одній стадії = тривога).\n- Звертай увагу на стадії \"Без статусу\", \"Attempted to Contact\", \"Lost Lead\", \"Contact in Future\" — це сигнали застрягання.\n- Виявляй дублі стадій з різним регістром (\"Contacted\" vs \"contacted\", \"Lost Lead\" vs \"lost\") — це проблема гігієни даних у CRM.\n- Аналізуй співвідношення Lost / Total — здоровий показник <15-20%.\n- Зіставляй з даними кваліфікації: якщо проблем у роботі агента немає, але ліди застрягають — проблема в наступних етапах (передача менеджеру, follow-up, оффер).\n\n## 2. Bottleneck (найбільш завантажена стадія)\n- Назви стадію з найбільшою кількістю лідів.\n- Поясни, ЧОМУ це bottleneck (це нормальна верхівка воронки чи реальне застрягання).\n- Окремо познач, якщо bottleneck знаходиться НЕ на верхівці воронки — це критичний сигнал.\n\n## 3. Менеджери, які потребують уваги\n- Якщо дані по менеджерах є — назви конкретні імена з обґрунтуванням (низька конверсія, багато Lost, лідів без статусу тощо).\n- Якщо даних по менеджерах немає — чесно вкажи: \"Для персональних рекомендацій потрібні дані в розрізі менеджерів. На основі поточних даних можна зробити загальний висновок: [висновок про команду в цілому]\".\n- НЕ вигадуй імена менеджерів.\n\n## 4. Рекомендації\nДавай 3-6 конкретних, діючих рекомендацій. Кожна рекомендація має містити:\n- ЩО зробити (конкретна дія)\n- ЧОМУ (на основі яких даних)\n- ОЧІКУВАНИЙ ефект\nПриклади хороших рекомендацій: уніфікувати назви стадій у CRM, ввести SLA на стадію X, провести reactivation-кампанію для Contact in Future, масштабувати успішний патерн Y на всю команду.\n\n# ПРАВИЛА\n- Базуй ВСІ висновки тільки на наданих даних. Не вигадуй цифри й імена.\n- Якщо даних недостатньо для якогось пункту — прямо скажи це у відповідному полі.\n- Використовуй конкретні числа й назви стадій з вхідних даних.\n- Враховуй успішні патерни — вони мають потрапити в рекомендації як \"масштабувати на команду\".\n- Пиши українською мовою, діловим, але живим тоном.\n\n# ФОРМАТ ВІДПОВІДІ\nПоверни СТРОГО валідний JSON без markdown-обгортки, без пояснень до або після:\n\n{\n  \"problems\": \"<розгорнутий опис проблем у воронці та кваліфікації з посиланням на конкретні цифри>\",\n  \"stage_bottel_neck\": \"<назва стадії> — <кількість лідів> (<%> від total). Причина: <пояснення>\",\n  \"managers\": \"<імена менеджерів і причини, чому вони потребують уваги; або чесна відповідь про відсутність даних>\",\n  \"recomendation\": \"1. <дія> — <обґрунтування> — <очікуваний ефект>\\n2. ...\\n3. ...\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        144,
+        -224
+      ],
+      "id": "8e4350e9-3958-4498-b553-0c5c05fbe0d2",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"problems\": {\n      \"type\": \"string\",\n      \"description\": \"Розгорнутий опис проблем у воронці та кваліфікації з посиланням на конкретні цифри\"\n    },\n    \"stage_bottel_neck\": {\n      \"type\": \"string\",\n      \"description\": \"Назва стадії, кількість лідів, відсоток від total, причина\"\n    },\n    \"managers\": {\n      \"type\": \"string\",\n      \"description\": \"Імена менеджерів і причини, чому вони потребують уваги, або чесна відповідь про відсутність даних\"\n    },\n    \"recomendation\": {\n      \"type\": \"string\",\n      \"description\": \"Список з 3-6 конкретних рекомендацій\"\n    }\n  },\n  \"required\": [\"problems\", \"stage_bottel_neck\", \"managers\", \"recomendation\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        288,
+        16
+      ],
+      "id": "c5c7b4ac-f995-4f47-b615-1635254b5ae3",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=📊 ЗВІТ CEO\n\nКількість лідів: {{ $('Code in JavaScript').item.json.total_leads }}\nНових лідів: {{ $('Code in JavaScript').item.json.new_leads_count }}\n\n🔍 ПРОБЛЕМИ:\n{{ $json.output.problems.replace(/[_*[\\]()~`>#+\\-=|{}.!]/g, '\\\\$&') }}\n\n⚠️ BOTTLENECK:\n{{ $json.output.stage_bottel_neck.replace(/[_*[\\]()~`>#+\\-=|{}.!]/g, '\\\\$&') }}\n\n👥 МЕНЕДЖЕРИ:\n{{ $json.output.managers.replace(/[_*[\\]()~`>#+\\-=|{}.!]/g, '\\\\$&') }}\n\n✅ РЕКОМЕНДАЦІЇ:\n{{ $json.output.recomendation.replace(/[_*[\\]()~`>#+\\-=|{}.!]/g, '\\\\$&') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "MarkdownV2"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        496,
+        -224
+      ],
+      "id": "aded0352-f96c-4608-942c-46a8d54b9290",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR telegramApi CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        160,
+        16
+      ],
+      "id": "2ed1e18a-91c0-4701-920b-5863add820d4",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR openAiApi CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.agileCrm",
+      "typeVersion": 1,
+      "position": [
+        -752,
+        -224
+      ],
+      "id": "986792e9-6ef4-4fd4-8d65-68f57bc27175",
+      "name": "Get many contacts",
+      "credentials": {
+        "agileCrmApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR agileCrmApi CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "помилки"
+            },
+            {
+              "fieldToAggregate": "проблема клієнта"
+            },
+            {
+              "fieldToAggregate": "успішний патерн"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -224
+      ],
+      "id": "b5b143dd-8aaa-4e6e-83b0-69a69900210a",
+      "name": "Aggregate"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many contacts": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

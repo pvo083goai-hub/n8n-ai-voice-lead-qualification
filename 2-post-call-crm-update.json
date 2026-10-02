@@ -1,0 +1,291 @@
+{
+  "name": "2 - POST_CALL CRM update + Telegram alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "post_call_summury",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1808,
+        96
+      ],
+      "id": "c6c6e63d-dc7e-47f1-a592-2fab7367ea80",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\n\n// ЗАЩИТА: ЕСЛИ ЭТО НЕ ВЫЗОВ save_call_summary (НЕТ ai_score) — НЕ ПАДАЕМ\nif (body.ai_score === undefined || body.ai_score === null || isNaN(Number(body.ai_score))) {\n  return [{\n    json: {\n      skip: true,\n      reason: \"Не є валідним save_call_summary payload (ймовірно, platform post_call_transcription webhook)\",\n      raw_type: body.type || \"unknown\"\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    skip: false,\n    lead_id: body.lead_id,\n    phone_number: body.phone_number,\n    ai_score: Number(body.ai_score),\n    skype_id: body.skype_id,\n    call_summary: body.call_summary\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1584,
+        96
+      ],
+      "id": "fcc399e2-a5a4-4739-9f04-66e8d096b8e4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cc94ea33-8d6b-44cc-bd4c-ea0f799f03e1",
+              "leftValue": "={{ $('Code in JavaScript').item.json.ai_score }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -656,
+        0
+      ],
+      "id": "d27a0df7-a098-48d3-a4e5-d75205bb4a4e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=📋 ЛІД НЕ КВАЛІФІКОВАНИЙ (Score: {{ $('Code in JavaScript').item.json.ai_score }}/100)\n👤 КЛІЄНТ: {{ $('Code in JavaScript1').item.json.first_name }} {{ $('Code in JavaScript1').item.json.last_name }}\n🏢 КОМПАНІЯ: {{ $('Code in JavaScript1').item.json.company || \"не вказано\" }}\n\nТЕЛЕФОН: {{ $('Code in JavaScript').item.json.phone_number }}\nLEAD ID (Agile CRM): {{ $('Code in JavaScript').item.json.lead_id }}\n\nРЕЗЮМЕ ДЗВІНКА:\n{{ $('Code in JavaScript').item.json.call_summary }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -432,
+        96
+      ],
+      "id": "cd1dace8-cab7-4da4-97f0-21eb4e6d2c82",
+      "name": "Send a text message TO coPARTNER",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR telegramApi CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔥 ГАРЯЧИЙ ЛІД (Score: {{ $('Code in JavaScript').item.json.ai_score }}/100)\n👤 КЛІЄНТ: {{ $('Code in JavaScript1').item.json.first_name }} {{ $('Code in JavaScript1').item.json.last_name }}\n🏢 КОМПАНІЯ: {{ $('Code in JavaScript1').item.json.company || \"не вказано\" }}\n\nТРЕБА ЗАТЕЛЕФОНУВАТИ ЛІДУ:\nТЕЛЕФОН: {{ $('Code in JavaScript').item.json.phone_number }}\nLEAD ID (Agile CRM): {{ $('Code in JavaScript').item.json.lead_id }}\n\nРЕЗЮМЕ ДЗВІНКА:\n{{ $('Code in JavaScript').item.json.call_summary }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -432,
+        -96
+      ],
+      "id": "29cd9298-50d3-4709-ae18-0b23e117e423",
+      "name": "POTENTIAL B2B LEAD message TO THE MANAGER",
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR telegramApi CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "contactId": "={{ $json.lead_id }}",
+        "additionalFields": {
+          "emailOptions": {
+            "emailProperties": []
+          },
+          "leadScore": "={{ $json.ai_score }}",
+          "phoneOptions": {
+            "phoneProperties": [
+              {
+                "subtype": "mobile",
+                "number": "="
+              }
+            ]
+          },
+          "customProperties": {
+            "customProperty": [
+              {
+                "name": "AI_Context",
+                "value": "={{ $json.call_summary }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.agileCrm",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        0
+      ],
+      "id": "d1cb6928-dc21-4702-88dd-2e8debadc8f2",
+      "name": "Update a contact",
+      "credentials": {
+        "agileCrmApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "YOUR agileCrmApi CREDENTIAL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ddaa7b24-284f-4467-82a6-5441e18b9566",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1360,
+        96
+      ],
+      "id": "35612693-f5c0-448f-ae80-c52cdf40f7e4",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const contact = $input.first().json;\nconst props = contact.properties || [];\n\nfunction getProp(name) {\n  const p = props.find(p => p.name === name);\n  return p ? p.value : \"\";\n}\n\nreturn [{\n  json: {\n    ...$('Code in JavaScript').item.json, // сохраняем lead_id, ai_score, call_summary и т.д.\n    first_name: getProp(\"first_name\"),\n    last_name: getProp(\"last_name\"),\n    company: getProp(\"company\")\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        0
+      ],
+      "id": "7cf11935-8ef3-40e3-a5e0-945f46367a9d",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "POTENTIAL B2B LEAD message TO THE MANAGER",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message TO coPARTNER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a contact": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Update a contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}
